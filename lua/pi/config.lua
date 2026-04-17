@@ -21,7 +21,7 @@ local M = {}
 ---@type PiConfig
 M.defaults = {
   split = "vertical",
-  split_size = 0.3,
+  split_size = 0.4,
   float_opts = {
     relative = "editor",
     width = 0.8,
