@@ -8,20 +8,23 @@ local job_id = nil
 local buffer = ""
 ---@type table<string, function>
 local pending = {} -- id → callback
----@type table<string, function>
-local event_handlers = {} -- event type → handler
+---@type table<string, function[]>
+local event_handlers = {} -- event type → list of handlers
 
-local config -- set via M.setup()
+local config
 
 function M.setup(cfg)
   config = cfg
 end
 
---- Start the RPC subprocess (if not already running)
 function M.start()
   if job_id then return end
 
-  local cmd = { config.pi_cmd, "--mode", "rpc", "--no-session", "--no-extensions" }
+  local cmd = { config.pi_cmd, "--mode", "rpc" }
+
+  for _, flag in ipairs(config.rpc_flags or {}) do
+    table.insert(cmd, flag)
+  end
 
   if config.model then
     table.insert(cmd, "--model")
@@ -31,10 +34,6 @@ function M.start()
   if config.thinking then
     table.insert(cmd, "--thinking")
     table.insert(cmd, config.thinking)
-  end
-
-  for _, arg in ipairs(config.rpc_args or {}) do
-    table.insert(cmd, arg)
   end
 
   buffer = ""
@@ -70,7 +69,12 @@ function M.start()
   end
 end
 
---- Stop the RPC subprocess
+function M.prewarm()
+  vim.defer_fn(function()
+    M.start()
+  end, 100)
+end
+
 function M.stop()
   if job_id then
     vim.fn.jobstop(job_id)
@@ -78,21 +82,15 @@ function M.stop()
   end
 end
 
---- Check if the RPC process is running
----@return boolean
 function M.is_running()
   return job_id ~= nil
 end
 
---- Send an RPC command
----@param cmd table The command object (type, etc.)
----@param callback function|nil Called with the response
+--- Send an RPC command with optional response callback
 function M.send(cmd, callback)
   M.start()
   if not job_id then
-    if callback then
-      callback({ success = false, error = "RPC process not running" })
-    end
+    if callback then callback({ success = false, error = "RPC process not running" }) end
     return
   end
   local id = util.id()
@@ -104,27 +102,26 @@ function M.send(cmd, callback)
   vim.fn.chansend(job_id, json)
 end
 
---- Register an event handler for streaming events
----@param event_type string
----@param handler function
----@return function unsubscribe
+--- Subscribe to an event type. Returns unsubscribe function.
 function M.on(event_type, handler)
-  event_handlers[event_type] = handler
+  if not event_handlers[event_type] then
+    event_handlers[event_type] = {}
+  end
+  table.insert(event_handlers[event_type], handler)
+
   return function()
-    if event_handlers[event_type] == handler then
-      event_handlers[event_type] = nil
+    local handlers = event_handlers[event_type]
+    if not handlers then return end
+    for i, h in ipairs(handlers) do
+      if h == handler then
+        table.remove(handlers, i)
+        return
+      end
     end
   end
 end
 
---- Process stdout data from the RPC process.
---- nvim's jobstart on_stdout gives a list of strings split by newlines.
---- E.g. ["partial"] or ["end of prev", "start of next"] or ["complete", ""].
----@param data string[]
 function M._on_stdout(data)
-  -- nvim splits on \n, so join with \n to reconstruct the stream
-  -- The last element is always "" if the chunk ended with \n,
-  -- or a partial line if it didn't.
   for i, chunk in ipairs(data) do
     if i > 1 then
       buffer = buffer .. "\n"
@@ -144,10 +141,7 @@ function M._on_stdout(data)
   end
 end
 
---- Route an event to the appropriate handler
----@param event table
 function M._handle_event(event)
-  -- Response to a pending request
   if event.type == "response" and event.id and pending[event.id] then
     local cb = pending[event.id]
     pending[event.id] = nil
@@ -155,30 +149,82 @@ function M._handle_event(event)
     return
   end
 
-  -- Streaming event → registered handler
-  local handler = event_handlers[event.type]
-  if handler then
-    handler(event)
+  local handlers = event_handlers[event.type]
+  if handlers then
+    for _, handler in ipairs(handlers) do
+      handler(event)
+    end
   end
 end
 
--- Convenience wrappers for common RPC commands
-
---- Send a prompt
+--- High-level streaming prompt. Returns a handle for the caller to
+--- receive deltas, tool events, and completion.
 ---@param message string
----@param callback function|nil
-function M.prompt(message, callback)
-  M.send({ type = "prompt", message = message }, callback)
+---@return table handle { on_delta, on_tool, on_done, abort }
+function M.prompt_stream(message)
+  local handle = {
+    _delta_cb = nil,
+    _tool_cb = nil,
+    _done_cb = nil,
+  }
+
+  function handle.on_delta(cb) handle._delta_cb = cb return handle end
+  function handle.on_tool(cb) handle._tool_cb = cb return handle end
+  function handle.on_done(cb) handle._done_cb = cb return handle end
+
+  function handle.abort()
+    M.send({ type = "abort" })
+  end
+
+  local unsubs = {}
+
+  table.insert(unsubs, M.on("message_update", function(event)
+    local delta = event.assistantMessageEvent
+    if delta and delta.type == "text_delta" and handle._delta_cb then
+      handle._delta_cb(delta.delta)
+    end
+  end))
+
+  table.insert(unsubs, M.on("tool_execution_start", function(event)
+    if handle._tool_cb then
+      handle._tool_cb({ status = "start", tool = event.toolName, args = event.args })
+    end
+  end))
+
+  table.insert(unsubs, M.on("tool_execution_end", function(event)
+    if handle._tool_cb then
+      handle._tool_cb({ status = "end", tool = event.toolName })
+    end
+  end))
+
+  table.insert(unsubs, M.on("agent_end", function()
+    for _, unsub in ipairs(unsubs) do unsub() end
+    if handle._done_cb then handle._done_cb() end
+  end))
+
+  -- Store unsubs so abort can clean up
+  function handle.cleanup()
+    for _, unsub in ipairs(unsubs) do unsub() end
+  end
+
+  M.send({ type = "prompt", message = message }, function(resp)
+    if not resp.success then
+      for _, unsub in ipairs(unsubs) do unsub() end
+      vim.notify("[pi.nvim] Prompt failed: " .. (resp.error or "unknown"), vim.log.levels.ERROR)
+    end
+  end)
+
+  return handle
 end
 
---- Abort current operation
----@param callback function|nil
-function M.abort(callback)
-  M.send({ type = "abort" }, callback)
+--- Reset the RPC session (wipe conversation, keep process alive)
+function M.new_session(callback)
+  M.send({ type = "new_session" }, function(resp)
+    if callback then callback(resp) end
+  end)
 end
 
 --- Get available models
----@param callback function Called with response.data.models
 function M.get_models(callback)
   M.send({ type = "get_available_models" }, function(resp)
     if resp.success and resp.data then
@@ -190,22 +236,16 @@ function M.get_models(callback)
 end
 
 --- Set model
----@param provider string
----@param model_id string
----@param callback function|nil
 function M.set_model(provider, model_id, callback)
   M.send({ type = "set_model", provider = provider, modelId = model_id }, callback)
 end
 
 --- Set thinking level
----@param level string
----@param callback function|nil
 function M.set_thinking(level, callback)
   M.send({ type = "set_thinking_level", level = level }, callback)
 end
 
 --- Get current state
----@param callback function
 function M.get_state(callback)
   M.send({ type = "get_state" }, function(resp)
     if resp.success and resp.data then

@@ -1,11 +1,6 @@
--- pi.nvim auto-loaded commands
--- These are available even before setup() is called,
--- but setup() must be called for keymaps and config.
-
 if vim.g.loaded_pi then return end
 vim.g.loaded_pi = true
 
--- User commands
 vim.api.nvim_create_user_command("Pi", function()
   require("pi.terminal").toggle()
 end, { desc = "Toggle Pi terminal" })
@@ -31,8 +26,7 @@ vim.api.nvim_create_user_command("PiQuick", function(opts)
   end
 end, { desc = "Quick Pi action", nargs = "?", range = true,
   complete = function()
-    local cfg = require("pi.config").defaults
-    return vim.tbl_keys(cfg.actions)
+    return vim.tbl_keys(require("pi.config").defaults.actions)
   end })
 
 vim.api.nvim_create_user_command("PiModel", function()
