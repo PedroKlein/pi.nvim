@@ -152,11 +152,11 @@ function Chat:_send_prompt(message)
   self.streaming = true
   self:_set_input_readonly(true)
 
-  self.handle = rpc.prompt_stream(message)
-    :on_delta(function(delta)
+  self.handle = rpc.prompt_stream(message, {
+    on_delta = function(delta)
       self:_append_delta(delta)
-    end)
-    :on_tool(function(event)
+    end,
+    on_tool = function(event)
       if event.status == "start" then
         local label = event.tool
         if event.args then
@@ -170,14 +170,15 @@ function Chat:_send_prompt(message)
         end
         self:_append_output("❯ " .. label)
       end
-    end)
-    :on_done(function()
+    end,
+    on_done = function()
       self.streaming = false
       self.handle = nil
       self:_set_input_readonly(false)
       self:_append_output("")
       self:_focus_input(true)
-    end)
+    end,
+  })
 end
 
 function Chat:_append_delta(text)

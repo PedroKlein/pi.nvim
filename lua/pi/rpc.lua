@@ -157,60 +157,54 @@ function M._handle_event(event)
   end
 end
 
---- High-level streaming prompt. Returns a handle for the caller to
---- receive deltas, tool events, and completion.
+--- High-level streaming prompt. Callbacks provided upfront to avoid
+--- colon/dot syntax issues with method chaining.
 ---@param message string
----@return table handle { on_delta, on_tool, on_done, abort }
-function M.prompt_stream(message)
-  local handle = {
-    _delta_cb = nil,
-    _tool_cb = nil,
-    _done_cb = nil,
-  }
+---@param opts { on_delta?: function, on_tool?: function, on_done?: function }
+---@return table handle { abort, cleanup }
+function M.prompt_stream(message, opts)
+  opts = opts or {}
 
-  function handle.on_delta(cb) handle._delta_cb = cb return handle end
-  function handle.on_tool(cb) handle._tool_cb = cb return handle end
-  function handle.on_done(cb) handle._done_cb = cb return handle end
+  local handle = {}
+  local unsubs = {}
 
   function handle.abort()
     M.send({ type = "abort" })
   end
 
-  local unsubs = {}
+  function handle.cleanup()
+    for _, unsub in ipairs(unsubs) do unsub() end
+  end
 
   table.insert(unsubs, M.on("message_update", function(event)
     local delta = event.assistantMessageEvent
-    if delta and delta.type == "text_delta" and handle._delta_cb then
-      handle._delta_cb(delta.delta)
+    if delta and delta.type == "text_delta" and opts.on_delta then
+      opts.on_delta(delta.delta)
     end
   end))
 
   table.insert(unsubs, M.on("tool_execution_start", function(event)
-    if handle._tool_cb then
-      handle._tool_cb({ status = "start", tool = event.toolName, args = event.args })
+    if opts.on_tool then
+      opts.on_tool({ status = "start", tool = event.toolName, args = event.args })
     end
   end))
 
   table.insert(unsubs, M.on("tool_execution_end", function(event)
-    if handle._tool_cb then
-      handle._tool_cb({ status = "end", tool = event.toolName })
+    if opts.on_tool then
+      opts.on_tool({ status = "end", tool = event.toolName })
     end
   end))
 
   table.insert(unsubs, M.on("agent_end", function()
     for _, unsub in ipairs(unsubs) do unsub() end
-    if handle._done_cb then handle._done_cb() end
+    if opts.on_done then opts.on_done() end
   end))
 
-  -- Store unsubs so abort can clean up
-  function handle.cleanup()
-    for _, unsub in ipairs(unsubs) do unsub() end
-  end
-
   M.send({ type = "prompt", message = message }, function(resp)
-    if not resp.success then
+    if not resp or not resp.success then
       for _, unsub in ipairs(unsubs) do unsub() end
-      vim.notify("[pi.nvim] Prompt failed: " .. (resp.error or "unknown"), vim.log.levels.ERROR)
+      local err = (resp and resp.error) or "unknown"
+      vim.notify("[pi.nvim] Prompt failed: " .. err, vim.log.levels.ERROR)
     end
   end)
 
@@ -227,8 +221,8 @@ end
 --- Get available models
 function M.get_models(callback)
   M.send({ type = "get_available_models" }, function(resp)
-    if resp.success and resp.data then
-      callback(resp.data.models)
+    if resp and resp.success and resp.data then
+      callback(resp.data.models or {})
     else
       callback({})
     end
@@ -248,7 +242,7 @@ end
 --- Get current state
 function M.get_state(callback)
   M.send({ type = "get_state" }, function(resp)
-    if resp.success and resp.data then
+    if resp and resp.success and resp.data then
       callback(resp.data)
     else
       callback(nil)

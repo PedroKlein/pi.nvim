@@ -73,6 +73,7 @@ function M._open_with_mode(mode)
   term_bufnr = vim.api.nvim_get_current_buf()
 
   pcall(vim.api.nvim_buf_set_name, term_bufnr, "pi://terminal")
+  vim.bo[term_bufnr].buflisted = false
   M._apply_win_opts(term_winid)
   M._setup_keymaps()
   vim.cmd("startinsert")
@@ -122,19 +123,13 @@ function M._apply_win_opts(win)
   pcall(vim.api.nvim_set_option_value, "statuscolumn", "", { win = win })
 end
 
+--- No leader-prefixed keymaps in terminal mode (causes space delay with space-leader)
 function M._setup_keymaps()
   if not term_bufnr then return end
   local buf = term_bufnr
   local opts = { buffer = buf, silent = true }
 
   vim.keymap.set("t", "<Esc><Esc>", [[<C-\><C-n>]], vim.tbl_extend("force", opts, { desc = "Exit terminal mode" }))
-
-  local toggle_key = config.keymaps and config.keymaps.toggle or "<leader>ao"
-  vim.keymap.set("t", toggle_key, function()
-    vim.cmd("stopinsert")
-    M.hide()
-  end, vim.tbl_extend("force", opts, { desc = "Pi: Hide terminal" }))
-
   vim.keymap.set("t", "<C-h>", [[<C-\><C-n><C-w>h]], vim.tbl_extend("force", opts, { desc = "Go left" }))
   vim.keymap.set("t", "<C-j>", [[<C-\><C-n><C-w>j]], vim.tbl_extend("force", opts, { desc = "Go down" }))
   vim.keymap.set("t", "<C-k>", [[<C-\><C-n><C-w>k]], vim.tbl_extend("force", opts, { desc = "Go up" }))
@@ -166,13 +161,14 @@ function M.toggle_float()
   end
 end
 
---- Send text to the terminal. If terminal isn't open, opens it first and
---- waits for the channel to be ready via TermOpen event.
 function M.send(text)
   if not M.is_open() then
     M.open()
-    -- Wait for terminal to be ready (channel established)
     vim.wait(2000, function() return term_chanid ~= nil end, 50)
+  elseif not M.is_visible() then
+    M._create_window(current_mode)
+    vim.api.nvim_win_set_buf(term_winid, term_bufnr)
+    M._apply_win_opts(term_winid)
   end
 
   if term_chanid then

@@ -71,4 +71,25 @@ function M.run_free()
   end)
 end
 
+--- Free-form prompt without selection (normal mode)
+function M.run_free_no_selection()
+  vim.ui.input({ prompt = "Pi: " }, function(prompt)
+    if not prompt or #prompt == 0 then return end
+
+    local file = util.get_filepath()
+    local full_prompt = table.concat({
+      "You are assisting in a Neovim editor. The user is working on " .. file .. ".",
+      "",
+      "Use your tools to explore context if needed before answering.",
+      "",
+      "User request: " .. prompt,
+    }, "\n")
+
+    chat.open({
+      title = "Pi",
+      initial_prompt = full_prompt,
+    })
+  end)
+end
+
 return M

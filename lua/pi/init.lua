@@ -88,6 +88,9 @@ function M._setup_keymaps()
   vmap(km.explain, function() quick.run_action("explain") end, "Pi: Explain selection")
   vmap(km.review, function() quick.run_action("review") end, "Pi: Review selection")
 
+  -- Quick prompt without selection (normal mode)
+  nmap(km.quick, quick.run_free_no_selection, "Pi: Quick prompt")
+
   -- Model / session
   nmap(km.model, models.pick_model, "Pi: Switch model")
   nmap(km.session, sessions.info, "Pi: Session info")
