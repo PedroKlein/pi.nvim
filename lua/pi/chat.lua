@@ -142,7 +142,11 @@ function Chat:_submit_input()
 
   -- Show user message in output
   self:_append_output("")
-  self:_append_output("**You:** " .. text)
+  self:_append_output("---")
+  self:_append_output("")
+  self:_append_output("### You")
+  self:_append_output("")
+  self:_append_output(text)
   self:_append_output("")
 
   self:_send_prompt(text)
@@ -150,28 +154,39 @@ end
 
 function Chat:_send_prompt(message)
   self.streaming = true
+  self._response_started = false
   self:_set_input_readonly(true)
+  self:_start_spinner()
 
   self.handle = rpc.prompt_stream(message, {
     on_delta = function(delta)
+      if not self._response_started then
+        self._response_started = true
+        self:_stop_spinner()
+        self:_append_output("### Pi")
+        self:_append_output("")
+      end
       self:_append_delta(delta)
     end,
     on_tool = function(event)
       if event.status == "start" then
+        self:_stop_spinner()
         local label = event.tool
         if event.args then
           if event.args.command then
-            label = label .. ": " .. event.args.command
+            label = label .. ": `" .. event.args.command .. "`"
           elseif event.args.path then
-            label = label .. ": " .. event.args.path
+            label = label .. ": `" .. event.args.path .. "`"
           elseif event.args.pattern then
-            label = label .. ": " .. event.args.pattern
+            label = label .. ": `" .. event.args.pattern .. "`"
           end
         end
-        self:_append_output("❯ " .. label)
+        self:_append_output("> " .. label)
       end
     end,
     on_done = function()
+      self:_stop_spinner()
+      self._response_started = false
       self.streaming = false
       self.handle = nil
       self:_set_input_readonly(false)
@@ -226,6 +241,48 @@ function Chat:_scroll_to_bottom()
   if self.output_win and vim.api.nvim_win_is_valid(self.output_win) then
     local line_count = vim.api.nvim_buf_line_count(self.output_buf)
     pcall(vim.api.nvim_win_set_cursor, self.output_win, { line_count, 0 })
+  end
+end
+
+local spinner_frames = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
+
+function Chat:_start_spinner()
+  self:_stop_spinner()
+
+  -- Add a spinner line to the output
+  self:_append_output("")
+  self._spinner_idx = 1
+  self._spinner_line = vim.api.nvim_buf_line_count(self.output_buf)
+
+  self._spinner_timer = vim.uv.new_timer()
+  self._spinner_timer:start(0, 80, vim.schedule_wrap(function()
+    if not self.output_buf or not vim.api.nvim_buf_is_valid(self.output_buf) then
+      self:_stop_spinner()
+      return
+    end
+
+    self._spinner_idx = (self._spinner_idx % #spinner_frames) + 1
+    local text = spinner_frames[self._spinner_idx] .. " Thinking..."
+
+    vim.bo[self.output_buf].modifiable = true
+    pcall(vim.api.nvim_buf_set_lines, self.output_buf, self._spinner_line - 1, self._spinner_line, false, { text })
+    vim.bo[self.output_buf].modifiable = false
+  end))
+end
+
+function Chat:_stop_spinner()
+  if self._spinner_timer then
+    self._spinner_timer:stop()
+    self._spinner_timer:close()
+    self._spinner_timer = nil
+  end
+
+  -- Remove the spinner line
+  if self._spinner_line and self.output_buf and vim.api.nvim_buf_is_valid(self.output_buf) then
+    vim.bo[self.output_buf].modifiable = true
+    pcall(vim.api.nvim_buf_set_lines, self.output_buf, self._spinner_line - 1, self._spinner_line, false, {})
+    vim.bo[self.output_buf].modifiable = false
+    self._spinner_line = nil
   end
 end
 
