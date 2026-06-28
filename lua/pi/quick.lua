@@ -24,16 +24,18 @@ function M.run_action(action_name)
   end
 
   local code = table.concat(lines, "\n")
+  local file = util.get_filepath()
   local prompt = util.expand_prompt(action.prompt, {
     code = code,
     filetype = util.get_filetype(),
-    file = util.get_filepath(),
+    file = file,
     start_line = tostring(start_line),
     end_line = tostring(end_line),
   })
 
   chat.open({
     title = action.desc or action_name,
+    display_prompt = (action.desc or action_name) .. " at " .. file .. ":" .. start_line .. "-" .. end_line,
     initial_prompt = prompt,
   })
 end
@@ -66,6 +68,7 @@ function M.run_free()
 
     chat.open({
       title = "Pi",
+      display_prompt = prompt,
       initial_prompt = full_prompt,
     })
   end)
@@ -118,6 +121,7 @@ function M.run_diagnostic()
 
   chat.open({
     title = "Explain Diagnostic",
+    display_prompt = table.concat(diag_text, "\n"),
     initial_prompt = prompt,
   })
 end
@@ -168,6 +172,7 @@ function M.run_fix()
 
   chat.open({
     title = "Fix Diagnostic",
+    display_prompt = "Fix: " .. table.concat(diag_text, " | "),
     initial_prompt = prompt,
   })
 end
@@ -203,6 +208,7 @@ function M.run_git_review()
 
   chat.open({
     title = "Review Changes",
+    display_prompt = "Review uncommitted changes in " .. file,
     initial_prompt = prompt,
   })
 end
@@ -223,6 +229,7 @@ function M.run_free_no_selection()
 
     chat.open({
       title = "Pi",
+      display_prompt = prompt,
       initial_prompt = full_prompt,
     })
   end)

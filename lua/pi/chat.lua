@@ -15,7 +15,7 @@ local Chat = {}
 Chat.__index = Chat
 
 --- Open a new ephemeral chat with an initial prompt
----@param opts { title: string, initial_prompt: string }
+---@param opts { title: string, initial_prompt: string, display_prompt?: string }
 ---@return PiChat
 function M.open(opts)
   local self = setmetatable({
@@ -25,6 +25,12 @@ function M.open(opts)
 
   self:_create_windows()
   self:_setup_keymaps()
+
+  -- Show user message in output
+  local display = opts.display_prompt or opts.title or "..."
+  self:_append_separator("user")
+  self:_append_output(display)
+  self:_append_output("")
 
   -- Reset RPC session then send initial prompt
   rpc.new_session(function()
