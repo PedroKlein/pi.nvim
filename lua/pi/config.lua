@@ -88,6 +88,14 @@ M.defaults = {
     diagnostic = "<leader>ad",
     fix = "<leader>af",
     git_review = "<leader>ag",
+
+    -- Terminal variants (same actions routed to TUI)
+    quick_terminal = "<leader>aQ",
+    explain_terminal = "<leader>aE",
+    review_terminal = "<leader>aV",
+    diagnostic_terminal = "<leader>aD",
+    fix_terminal = "<leader>aF",
+    git_review_terminal = "<leader>aG",
   },
 }
 

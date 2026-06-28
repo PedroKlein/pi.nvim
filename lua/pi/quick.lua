@@ -9,8 +9,23 @@ function M.setup(cfg)
   config = cfg
 end
 
+--- Route prompt to chat or terminal based on target
+---@param target "chat"|"terminal"
+local function dispatch(target, opts)
+  if target == "terminal" then
+    require("pi.terminal").send_submit(opts.initial_prompt)
+  else
+    chat.open(opts)
+  end
+end
+
 --- Run a named action (explain, review) on the visual selection
-function M.run_action(action_name)
+---@param action_name string
+---@param opts? { target: "chat"|"terminal" }
+function M.run_action(action_name, opts)
+  opts = opts or {}
+  local target = opts.target or "chat"
+
   local action = config.actions[action_name]
   if not action then
     vim.notify("[pi.nvim] Unknown action: " .. action_name, vim.log.levels.ERROR)
@@ -33,7 +48,7 @@ function M.run_action(action_name)
     end_line = tostring(end_line),
   })
 
-  chat.open({
+  dispatch(target, {
     title = action.desc or action_name,
     display_prompt = (action.desc or action_name) .. " at " .. file .. ":" .. start_line .. "-" .. end_line,
     initial_prompt = prompt,
@@ -41,7 +56,11 @@ function M.run_action(action_name)
 end
 
 --- Free-form prompt on visual selection
-function M.run_free()
+---@param opts? { target: "chat"|"terminal" }
+function M.run_free(opts)
+  opts = opts or {}
+  local target = opts.target or "chat"
+
   local lines, start_line, end_line = util.get_visual_selection()
   if #lines == 0 then
     vim.notify("[pi.nvim] No selection", vim.log.levels.WARN)
@@ -51,7 +70,7 @@ function M.run_free()
   local code = table.concat(lines, "\n")
   local ft = util.get_filetype()
   local file = util.get_filepath()
-  local context = string.format("File: `%s:%d-%d`\n```%s\n%s\n```", file, start_line, end_line, ft, code)
+  local context_str = string.format("File: `%s:%d-%d`\n```%s\n%s\n```", file, start_line, end_line, ft, code)
 
   vim.ui.input({ prompt = "Pi: " }, function(prompt)
     if not prompt or #prompt == 0 then return end
@@ -63,10 +82,10 @@ function M.run_free()
       "",
       "User request: " .. prompt,
       "",
-      context,
+      context_str,
     }, "\n")
 
-    chat.open({
+    dispatch(target, {
       title = "Pi",
       display_prompt = prompt,
       initial_prompt = full_prompt,
@@ -75,7 +94,11 @@ function M.run_free()
 end
 
 --- Explain LSP diagnostics at the cursor line
-function M.run_diagnostic()
+---@param opts? { target: "chat"|"terminal" }
+function M.run_diagnostic(opts)
+  opts = opts or {}
+  local target = opts.target or "chat"
+
   local cursor = vim.api.nvim_win_get_cursor(0)
   local line = cursor[1] - 1
   local diagnostics = vim.diagnostic.get(0, { lnum = line })
@@ -119,7 +142,7 @@ function M.run_diagnostic()
     "```",
   }, "\n")
 
-  chat.open({
+  dispatch(target, {
     title = "Explain Diagnostic",
     display_prompt = table.concat(diag_text, "\n"),
     initial_prompt = prompt,
@@ -127,7 +150,11 @@ function M.run_diagnostic()
 end
 
 --- Fix LSP diagnostics at the cursor line by editing the file directly
-function M.run_fix()
+---@param opts? { target: "chat"|"terminal" }
+function M.run_fix(opts)
+  opts = opts or {}
+  local target = opts.target or "chat"
+
   local cursor = vim.api.nvim_win_get_cursor(0)
   local line = cursor[1] - 1
   local diagnostics = vim.diagnostic.get(0, { lnum = line })
@@ -170,7 +197,7 @@ function M.run_fix()
     "```",
   }, "\n")
 
-  chat.open({
+  dispatch(target, {
     title = "Fix Diagnostic",
     display_prompt = "Fix: " .. table.concat(diag_text, " | "),
     initial_prompt = prompt,
@@ -178,7 +205,11 @@ function M.run_fix()
 end
 
 --- Review uncommitted git changes in the current file
-function M.run_git_review()
+---@param opts? { target: "chat"|"terminal" }
+function M.run_git_review(opts)
+  opts = opts or {}
+  local target = opts.target or "chat"
+
   local file = util.get_filepath()
   if file == "[unsaved]" then
     vim.notify("[pi.nvim] Buffer has no file", vim.log.levels.WARN)
@@ -206,7 +237,7 @@ function M.run_git_review()
     "```",
   }, "\n")
 
-  chat.open({
+  dispatch(target, {
     title = "Review Changes",
     display_prompt = "Review uncommitted changes in " .. file,
     initial_prompt = prompt,
@@ -214,7 +245,11 @@ function M.run_git_review()
 end
 
 --- Free-form prompt without selection (normal mode)
-function M.run_free_no_selection()
+---@param opts? { target: "chat"|"terminal" }
+function M.run_free_no_selection(opts)
+  opts = opts or {}
+  local target = opts.target or "chat"
+
   vim.ui.input({ prompt = "Pi: " }, function(prompt)
     if not prompt or #prompt == 0 then return end
 
@@ -227,7 +262,7 @@ function M.run_free_no_selection()
       "User request: " .. prompt,
     }, "\n")
 
-    chat.open({
+    dispatch(target, {
       title = "Pi",
       display_prompt = prompt,
       initial_prompt = full_prompt,

@@ -28,6 +28,12 @@ return {
     { "<leader>ad", desc = "Pi: Explain diagnostic" },
     { "<leader>af", desc = "Pi: Fix diagnostic" },
     { "<leader>ag", desc = "Pi: Review git changes" },
+    { "<leader>aQ", desc = "Pi: Quick prompt (terminal)", mode = { "n", "v" } },
+    { "<leader>aE", desc = "Pi: Explain (terminal)", mode = "v" },
+    { "<leader>aV", desc = "Pi: Review (terminal)", mode = "v" },
+    { "<leader>aD", desc = "Pi: Explain diagnostic (terminal)" },
+    { "<leader>aF", desc = "Pi: Fix diagnostic (terminal)" },
+    { "<leader>aG", desc = "Pi: Review git changes (terminal)" },
     { "<leader>am", desc = "Pi: Switch model" },
     { "<leader>ai", desc = "Pi: Session info" },
     { "<leader>ar", desc = "Pi: Resume last chat" },
@@ -50,7 +56,7 @@ return {
 
 ## Keymaps
 
-All keymaps use `<leader>a` (AI prefix).
+All keymaps use `<leader>a` (AI prefix). Lowercase opens the mini-chat (headless RPC), uppercase sends the same action to the full TUI terminal.
 
 | Key | Mode | What it does |
 |-----|------|--------------|
@@ -63,7 +69,13 @@ All keymaps use `<leader>a` (AI prefix).
 | `<leader>ad` | n | Explain LSP diagnostic at cursor (opens mini-chat) |
 | `<leader>af` | n | Fix LSP diagnostic at cursor (Pi edits file directly) |
 | `<leader>ag` | n | Review uncommitted git changes in current file |
-| `<leader>aq` | v | Free prompt on selection (opens mini-chat) |
+| `<leader>aq` | n/v | Free prompt (opens mini-chat) |
+| `<leader>aE` | v | Explain selection (terminal) |
+| `<leader>aV` | v | Review selection (terminal) |
+| `<leader>aD` | n | Explain LSP diagnostic at cursor (terminal) |
+| `<leader>aF` | n | Fix LSP diagnostic at cursor (terminal) |
+| `<leader>aG` | n | Review uncommitted git changes (terminal) |
+| `<leader>aQ` | n/v | Free prompt (terminal) |
 | `<leader>am` | n | Switch RPC model |
 | `<leader>ai` | n | Session info |
 | `<leader>ar` | n | Resume last mini-chat session |
@@ -186,6 +198,13 @@ require("pi").setup({
     diagnostic = "<leader>ad",
     fix = "<leader>af",
     git_review = "<leader>ag",
+    -- Terminal variants (same actions routed to TUI)
+    quick_terminal = "<leader>aQ",
+    explain_terminal = "<leader>aE",
+    review_terminal = "<leader>aV",
+    diagnostic_terminal = "<leader>aD",
+    fix_terminal = "<leader>aF",
+    git_review_terminal = "<leader>aG",
     model = "<leader>am",
     session = "<leader>ai",
     resume = "<leader>ar",

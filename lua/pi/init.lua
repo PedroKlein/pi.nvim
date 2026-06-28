@@ -103,6 +103,16 @@ function M._setup_keymaps()
   -- Quick prompt without selection (normal mode)
   nmap(km.quick, quick.run_free_no_selection, "Pi: Quick prompt")
 
+  -- Terminal variants (same actions routed to TUI)
+  local t = { target = "terminal" }
+  vmap(km.quick_terminal, function() quick.run_free(t) end, "Pi: Quick action on selection (terminal)")
+  vmap(km.explain_terminal, function() quick.run_action("explain", t) end, "Pi: Explain selection (terminal)")
+  vmap(km.review_terminal, function() quick.run_action("review", t) end, "Pi: Review selection (terminal)")
+  nmap(km.diagnostic_terminal, function() quick.run_diagnostic(t) end, "Pi: Explain diagnostic (terminal)")
+  nmap(km.fix_terminal, function() quick.run_fix(t) end, "Pi: Fix diagnostic (terminal)")
+  nmap(km.git_review_terminal, function() quick.run_git_review(t) end, "Pi: Review git changes (terminal)")
+  nmap(km.quick_terminal, function() quick.run_free_no_selection(t) end, "Pi: Quick prompt (terminal)")
+
   -- Model / session
   nmap(km.model, models.pick_model, "Pi: Switch model")
   nmap(km.session, sessions.info, "Pi: Session info")
