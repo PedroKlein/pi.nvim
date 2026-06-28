@@ -25,6 +25,9 @@ return {
     { "<leader>aq", desc = "Pi: Quick prompt", mode = { "n", "v" } },
     { "<leader>ae", desc = "Pi: Explain", mode = "v" },
     { "<leader>av", desc = "Pi: Review", mode = "v" },
+    { "<leader>ad", desc = "Pi: Explain diagnostic" },
+    { "<leader>af", desc = "Pi: Fix diagnostic" },
+    { "<leader>ag", desc = "Pi: Review git changes" },
     { "<leader>am", desc = "Pi: Switch model" },
     { "<leader>ai", desc = "Pi: Session info" },
     { "<leader>ar", desc = "Pi: Resume last chat" },
@@ -57,6 +60,9 @@ All keymaps use `<leader>a` (AI prefix).
 | `<leader>as` | n | Ask for prompt, send @file reference to terminal |
 | `<leader>ae` | v | Explain selection (opens mini-chat) |
 | `<leader>av` | v | Review selection (opens mini-chat) |
+| `<leader>ad` | n | Explain LSP diagnostic at cursor (opens mini-chat) |
+| `<leader>af` | n | Fix LSP diagnostic at cursor (Pi edits file directly) |
+| `<leader>ag` | n | Review uncommitted git changes in current file |
 | `<leader>aq` | v | Free prompt on selection (opens mini-chat) |
 | `<leader>am` | n | Switch RPC model |
 | `<leader>ai` | n | Session info |
@@ -176,6 +182,9 @@ require("pi").setup({
     quick = "<leader>aq",
     explain = "<leader>ae",
     review = "<leader>av",
+    diagnostic = "<leader>ad",
+    fix = "<leader>af",
+    git_review = "<leader>ag",
     model = "<leader>am",
     session = "<leader>ai",
     resume = "<leader>ar",

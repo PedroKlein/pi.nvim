@@ -85,6 +85,9 @@ M.defaults = {
     model = "<leader>am",
     session = "<leader>ai",
     resume = "<leader>ar",
+    diagnostic = "<leader>ad",
+    fix = "<leader>af",
+    git_review = "<leader>ag",
   },
 }
 

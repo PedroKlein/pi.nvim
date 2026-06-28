@@ -95,6 +95,11 @@ function M._setup_keymaps()
   vmap(km.explain, function() quick.run_action("explain") end, "Pi: Explain selection")
   vmap(km.review, function() quick.run_action("review") end, "Pi: Review selection")
 
+  -- Context-aware actions (normal mode)
+  nmap(km.diagnostic, quick.run_diagnostic, "Pi: Explain diagnostic")
+  nmap(km.fix, quick.run_fix, "Pi: Fix diagnostic")
+  nmap(km.git_review, quick.run_git_review, "Pi: Review git changes")
+
   -- Quick prompt without selection (normal mode)
   nmap(km.quick, quick.run_free_no_selection, "Pi: Quick prompt")
 

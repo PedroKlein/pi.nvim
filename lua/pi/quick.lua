@@ -71,6 +71,142 @@ function M.run_free()
   end)
 end
 
+--- Explain LSP diagnostics at the cursor line
+function M.run_diagnostic()
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  local line = cursor[1] - 1
+  local diagnostics = vim.diagnostic.get(0, { lnum = line })
+
+  if #diagnostics == 0 then
+    vim.notify("[pi.nvim] No diagnostics on this line", vim.log.levels.WARN)
+    return
+  end
+
+  local severity_names = { "ERROR", "WARN", "INFO", "HINT" }
+  local diag_text = {}
+  for _, d in ipairs(diagnostics) do
+    local sev = severity_names[d.severity] or "UNKNOWN"
+    local source = d.source or "unknown"
+    table.insert(diag_text, string.format("[%s] (%s): %s", sev, source, d.message))
+  end
+
+  local context_radius = 5
+  local total_lines = vim.api.nvim_buf_line_count(0)
+  local start_ctx = math.max(0, line - context_radius)
+  local end_ctx = math.min(total_lines, line + context_radius + 1)
+  local buf_lines = vim.api.nvim_buf_get_lines(0, start_ctx, end_ctx, false)
+  local code = table.concat(buf_lines, "\n")
+  local file = util.get_filepath()
+  local ft = util.get_filetype()
+
+  local prompt = table.concat({
+    "You are assisting in a Neovim editor. The user has LSP diagnostics at " .. file .. ":" .. (line + 1) .. ".",
+    "",
+    "Diagnostics:",
+    table.concat(diag_text, "\n"),
+    "",
+    "Use your tools to read the file and understand the surrounding context — imports, types, related code. Then explain:",
+    "1. What this diagnostic means",
+    "2. Why it's triggered here",
+    "3. How to fix it",
+    "",
+    "Code around line " .. (line + 1) .. ":",
+    "```" .. ft,
+    code,
+    "```",
+  }, "\n")
+
+  chat.open({
+    title = "Explain Diagnostic",
+    initial_prompt = prompt,
+  })
+end
+
+--- Fix LSP diagnostics at the cursor line by editing the file directly
+function M.run_fix()
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  local line = cursor[1] - 1
+  local diagnostics = vim.diagnostic.get(0, { lnum = line })
+
+  if #diagnostics == 0 then
+    vim.notify("[pi.nvim] No diagnostics on this line", vim.log.levels.WARN)
+    return
+  end
+
+  local severity_names = { "ERROR", "WARN", "INFO", "HINT" }
+  local diag_text = {}
+  for _, d in ipairs(diagnostics) do
+    local sev = severity_names[d.severity] or "UNKNOWN"
+    local source = d.source or "unknown"
+    table.insert(diag_text, string.format("[%s] (%s): %s", sev, source, d.message))
+  end
+
+  local context_radius = 5
+  local total_lines = vim.api.nvim_buf_line_count(0)
+  local start_ctx = math.max(0, line - context_radius)
+  local end_ctx = math.min(total_lines, line + context_radius + 1)
+  local buf_lines = vim.api.nvim_buf_get_lines(0, start_ctx, end_ctx, false)
+  local code = table.concat(buf_lines, "\n")
+  local file = util.get_filepath()
+  local ft = util.get_filetype()
+
+  local prompt = table.concat({
+    "You are assisting in a Neovim editor. The user has LSP diagnostics at " .. file .. ":" .. (line + 1) .. ".",
+    "",
+    "Diagnostics:",
+    table.concat(diag_text, "\n"),
+    "",
+    "If this is a straightforward fix, use your edit tool to apply it directly to the file. Be minimal — only change what's needed to resolve the diagnostic.",
+    "",
+    "If the fix is ambiguous or requires broader refactoring, explain the options instead of editing.",
+    "",
+    "Code around line " .. (line + 1) .. ":",
+    "```" .. ft,
+    code,
+    "```",
+  }, "\n")
+
+  chat.open({
+    title = "Fix Diagnostic",
+    initial_prompt = prompt,
+  })
+end
+
+--- Review uncommitted git changes in the current file
+function M.run_git_review()
+  local file = util.get_filepath()
+  if file == "[unsaved]" then
+    vim.notify("[pi.nvim] Buffer has no file", vim.log.levels.WARN)
+    return
+  end
+
+  local diff = vim.fn.system({ "git", "diff", "--", file })
+  local staged_diff = vim.fn.system({ "git", "diff", "--cached", "--", file })
+  local combined = (diff or "") .. (staged_diff or "")
+
+  if combined == "" then
+    vim.notify("[pi.nvim] No uncommitted changes in this file", vim.log.levels.INFO)
+    return
+  end
+
+  local prompt = table.concat({
+    "You are reviewing uncommitted changes in a Neovim editor.",
+    "",
+    "File: " .. file,
+    "",
+    "Review the following git diff. Look for bugs, edge cases, missed error handling, and anything that could break. Be specific and reference line numbers from the diff.",
+    "",
+    "```diff",
+    vim.fn.trim(combined),
+    "```",
+  }, "\n")
+
+  chat.open({
+    title = "Review Changes",
+    initial_prompt = prompt,
+  })
+end
+
 --- Free-form prompt without selection (normal mode)
 function M.run_free_no_selection()
   vim.ui.input({ prompt = "Pi: " }, function(prompt)
