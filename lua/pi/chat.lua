@@ -259,18 +259,20 @@ function Chat:_append_output(line)
 
   vim.bo[self.output_buf].modifiable = true
 
+  local parts = vim.split(line, "\n", { plain = true })
+
   local line_count = vim.api.nvim_buf_line_count(self.output_buf)
   -- If buffer is empty (single empty line), replace it
   if line_count == 1 then
     local first = vim.api.nvim_buf_get_lines(self.output_buf, 0, 1, false)[1]
     if first == "" then
-      vim.api.nvim_buf_set_lines(self.output_buf, 0, 1, false, { line })
+      vim.api.nvim_buf_set_lines(self.output_buf, 0, 1, false, parts)
       vim.bo[self.output_buf].modifiable = false
       return
     end
   end
 
-  vim.api.nvim_buf_set_lines(self.output_buf, line_count, line_count, false, { line })
+  vim.api.nvim_buf_set_lines(self.output_buf, line_count, line_count, false, parts)
   vim.bo[self.output_buf].modifiable = false
   self:_scroll_to_bottom()
 end
