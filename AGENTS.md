@@ -44,4 +44,5 @@ No automated test suite currently. Verification is manual in Neovim. Key things 
 3. Follow-up messages work in mini-chat
 4. `q` closes mini-chat cleanly (no orphan windows or processes)
 5. `<leader>as` in visual mode sends selection to terminal
-6. `:PiStop` kills everything
+6. `q` (normal) and `<C-q>` (terminal mode) hide the terminal float
+7. `:PiStop` kills everything

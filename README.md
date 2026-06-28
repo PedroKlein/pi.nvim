@@ -110,11 +110,12 @@ If you close the chat and want to continue the conversation, use `<leader>ar` to
 
 When inside the terminal buffer:
 
-| Key | Action |
-|-----|--------|
-| `<Esc><Esc>` | Exit terminal mode |
-| `<leader>ao` | Hide terminal |
-| `<C-h/j/k/l>` | Navigate to adjacent windows |
+| Key | Mode | Action |
+|-----|------|--------|
+| `<Esc><Esc>` | terminal | Exit terminal mode (enter normal) |
+| `<C-q>` | terminal | Hide terminal |
+| `q` | normal | Hide terminal |
+| `<C-h/j/k/l>` | terminal | Navigate to adjacent windows |
 
 ## Commands
 

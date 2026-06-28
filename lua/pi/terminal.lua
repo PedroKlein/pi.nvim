@@ -134,6 +134,9 @@ function M._setup_keymaps()
   vim.keymap.set("t", "<C-j>", [[<C-\><C-n><C-w>j]], vim.tbl_extend("force", opts, { desc = "Go down" }))
   vim.keymap.set("t", "<C-k>", [[<C-\><C-n><C-w>k]], vim.tbl_extend("force", opts, { desc = "Go up" }))
   vim.keymap.set("t", "<C-l>", [[<C-\><C-n><C-w>l]], vim.tbl_extend("force", opts, { desc = "Go right" }))
+
+  vim.keymap.set("n", "q", function() M.hide() end, vim.tbl_extend("force", opts, { desc = "Hide terminal" }))
+  vim.keymap.set("t", "<C-q>", function() M.hide() end, vim.tbl_extend("force", opts, { desc = "Hide terminal" }))
 end
 
 function M.hide()
