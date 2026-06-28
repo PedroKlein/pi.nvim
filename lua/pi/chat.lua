@@ -1,6 +1,7 @@
 local rpc = require("pi.rpc")
 
 local M = {}
+local last_chat_state = nil
 
 ---@class PiChat
 ---@field output_buf number
@@ -33,6 +34,40 @@ function M.open(opts)
   return self
 end
 
+function M.resume()
+  if not last_chat_state then
+    vim.notify("[pi.nvim] No previous chat to resume", vim.log.levels.INFO)
+    return
+  end
+
+  local self = setmetatable({
+    streaming = false,
+    title = last_chat_state.title,
+  }, Chat)
+
+  self:_create_windows()
+  self:_setup_keymaps()
+
+  -- Restore output content without resetting RPC session
+  vim.bo[self.output_buf].modifiable = true
+  vim.api.nvim_buf_set_lines(self.output_buf, 0, -1, false, last_chat_state.lines)
+  vim.bo[self.output_buf].modifiable = false
+
+  -- Re-apply separator highlights
+  for _, lnum in ipairs(last_chat_state.separator_lines or {}) do
+    if lnum < vim.api.nvim_buf_line_count(self.output_buf) then
+      local line_text = vim.api.nvim_buf_get_lines(self.output_buf, lnum, lnum + 1, false)[1] or ""
+      local hl = line_text:find("You") and "PiChatUser" or "PiChatAssistant"
+      vim.api.nvim_buf_add_highlight(self.output_buf, -1, hl, lnum, 0, -1)
+    end
+  end
+
+  self:_scroll_to_bottom()
+  self:_focus_input(true)
+
+  return self
+end
+
 function Chat:_create_windows()
   local width = math.floor(vim.o.columns * 0.7)
   local total_height = math.floor(vim.o.lines * 0.7)
@@ -46,6 +81,7 @@ function Chat:_create_windows()
   self.output_buf = vim.api.nvim_create_buf(false, true)
   vim.bo[self.output_buf].filetype = "markdown"
   vim.bo[self.output_buf].bufhidden = "wipe"
+  self:_silence_buf(self.output_buf)
 
   self.output_win = vim.api.nvim_open_win(self.output_buf, true, {
     relative = "editor",
@@ -61,10 +97,10 @@ function Chat:_create_windows()
   vim.api.nvim_set_option_value("wrap", true, { win = self.output_win })
   vim.api.nvim_set_option_value("linebreak", true, { win = self.output_win })
 
-  -- Input buffer (editable)
+  -- Input buffer (editable, plain text)
   self.input_buf = vim.api.nvim_create_buf(false, true)
-  vim.bo[self.input_buf].filetype = "markdown"
   vim.bo[self.input_buf].bufhidden = "wipe"
+  self:_silence_buf(self.input_buf)
 
   self.input_win = vim.api.nvim_open_win(self.input_buf, false, {
     relative = "editor",
@@ -78,7 +114,8 @@ function Chat:_create_windows()
     style = "minimal",
   })
 
-  -- Focus stays on output initially (streaming will start there)
+  -- Track separator line numbers for resume highlight restoration
+  self._separator_lines = {}
 end
 
 function Chat:_setup_keymaps()
@@ -141,11 +178,7 @@ function Chat:_submit_input()
   vim.cmd("stopinsert")
 
   -- Show user message in output
-  self:_append_output("")
-  self:_append_output("---")
-  self:_append_output("")
-  self:_append_output("### You")
-  self:_append_output("")
+  self:_append_separator("user")
   self:_append_output(text)
   self:_append_output("")
 
@@ -163,8 +196,7 @@ function Chat:_send_prompt(message)
       if not self._response_started then
         self._response_started = true
         self:_stop_spinner()
-        self:_append_output("### Pi")
-        self:_append_output("")
+        self:_append_separator("assistant")
       end
       self:_append_delta(delta)
     end,
@@ -311,6 +343,15 @@ function Chat:close()
     self.handle = nil
   end
 
+  -- Save state for resume
+  if self.output_buf and vim.api.nvim_buf_is_valid(self.output_buf) then
+    last_chat_state = {
+      lines = vim.api.nvim_buf_get_lines(self.output_buf, 0, -1, false),
+      title = self.title,
+      separator_lines = self._separator_lines or {},
+    }
+  end
+
   if self.output_win and vim.api.nvim_win_is_valid(self.output_win) then
     vim.api.nvim_win_close(self.output_win, true)
   end
@@ -323,6 +364,38 @@ function Chat:close()
   self.output_buf = nil
   self.input_buf = nil
   self.streaming = false
+end
+
+--- Disable diagnostics, LSP, completion, and suggestions for a buffer
+function Chat:_silence_buf(buf)
+  vim.diagnostic.enable(false, { bufnr = buf })
+
+  vim.api.nvim_create_autocmd("LspAttach", {
+    buffer = buf,
+    callback = function(args)
+      vim.lsp.buf_detach_client(buf, args.data.client_id)
+    end,
+  })
+
+  vim.b[buf].completion = false
+  vim.b[buf].cmp = false
+  vim.b[buf].copilot_enabled = false
+end
+
+function Chat:_append_separator(role)
+  local icon = role == "user" and "󰙈" or ""
+  local label = role == "user" and "You" or "Pi"
+  local hl = role == "user" and "PiChatUser" or "PiChatAssistant"
+
+  local text = "━━━ " .. icon .. " " .. label .. " " .. string.rep("━", 40)
+  self:_append_output("")
+  self:_append_output(text)
+  self:_append_output("")
+
+  -- Highlight the separator line (line_count - 1 points to the text, 0-indexed)
+  local lnum = vim.api.nvim_buf_line_count(self.output_buf) - 2
+  vim.api.nvim_buf_add_highlight(self.output_buf, -1, hl, lnum, 0, -1)
+  table.insert(self._separator_lines, lnum)
 end
 
 return M

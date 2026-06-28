@@ -12,6 +12,8 @@ function M.setup(opts)
   require("pi.rpc").setup(M.config)
   require("pi.quick").setup(M.config)
 
+  M._setup_highlights()
+
   if M.config.auto_reload then
     M._setup_auto_reload()
   end
@@ -21,6 +23,11 @@ function M.setup(opts)
   end
 
   M._setup_keymaps()
+end
+
+function M._setup_highlights()
+  vim.api.nvim_set_hl(0, "PiChatUser", { fg = "#a6da95", bold = true })
+  vim.api.nvim_set_hl(0, "PiChatAssistant", { fg = "#c6a0f6", bold = true })
 end
 
 function M._setup_auto_reload()
@@ -94,6 +101,7 @@ function M._setup_keymaps()
   -- Model / session
   nmap(km.model, models.pick_model, "Pi: Switch model")
   nmap(km.session, sessions.info, "Pi: Session info")
+  nmap(km.resume, function() require("pi.chat").resume() end, "Pi: Resume last chat")
 
   -- Register which-key group
   local ok, wk = pcall(require, "which-key")

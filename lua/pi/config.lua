@@ -84,6 +84,7 @@ M.defaults = {
     review = "<leader>av",
     model = "<leader>am",
     session = "<leader>ai",
+    resume = "<leader>ar",
   },
 }
 

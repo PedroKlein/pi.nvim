@@ -27,6 +27,7 @@ return {
     { "<leader>av", desc = "Pi: Review", mode = "v" },
     { "<leader>am", desc = "Pi: Switch model" },
     { "<leader>ai", desc = "Pi: Session info" },
+    { "<leader>ar", desc = "Pi: Resume last chat" },
   },
   opts = {
     split = "vertical",
@@ -59,6 +60,7 @@ All keymaps use `<leader>a` (AI prefix).
 | `<leader>aq` | v | Free prompt on selection (opens mini-chat) |
 | `<leader>am` | n | Switch RPC model |
 | `<leader>ai` | n | Session info |
+| `<leader>ar` | n | Resume last mini-chat session |
 
 ## Mini-chat
 
@@ -93,6 +95,8 @@ The output window is readonly. You navigate it with normal vim motions (j/k, /, 
 | `q` | either (normal) | Close the chat |
 
 Each time you open a quick action, it starts a fresh conversation. Pi uses its built-in tools (read, grep, ls) to explore the codebase before answering, so you'll see tool calls appear as they happen.
+
+If you close the chat and want to continue the conversation, use `<leader>ar` to resume. This reopens the window with the previous content and preserves the RPC session context, so follow-up messages still have the full conversation history.
 
 ## Terminal mode
 
@@ -174,6 +178,7 @@ require("pi").setup({
     review = "<leader>av",
     model = "<leader>am",
     session = "<leader>ai",
+    resume = "<leader>ar",
   },
 })
 ```
